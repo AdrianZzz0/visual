@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-black">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astraea-IX | Dashboard de Telemetría Espacial</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Orbitron & Share Tech Mono & Rajdhani -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            blue: '#00f0ff',
+                            darkblue: '#002b49',
+                            teal: '#00ffcc',
+                            purple: '#7000ff',
+                            pink: '#ff007f',
+                            bg: '#050b14',
+                            card: '#0a1526',
+                            border: '#162a45'
+                        }
+                    },
+                    fontFamily: {
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        mono: ['Share Tech Mono', 'monospace'],
+                        rajdhani: ['Rajdhani', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Glowing & Grid Styles */
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #030712;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08), transparent 70%),
+                linear-gradient(to right, rgba(22, 42, 69, 0.2) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(22, 42, 69, 0.2) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        .cyber-panel {
+            background: rgba(10, 21, 38, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.05), inset 0 0 15px rgba(0, 240, 255, 0.03);
+            position: relative;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+        }
+
+        .cyber-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 8px;
+            border-top: 2px solid #00f0ff;
+            border-left: 2px solid #00f0ff;
+        }
+
+        .cyber-panel::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            border-bottom: 2px solid #00f0ff;
+            border-right: 2px solid #00f0ff;
+        }
+
+        .glow-text-cyan {
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+        }
+
+        .glow-text-pink {
+            text-shadow: 0 0 8px rgba(255, 0, 127, 0.6);
+        }
+
+        .glow-border {
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+
+        /* Animated Radar Sweep */
+        @keyframes sweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .radar-sweep {
+            animation: sweep 4s linear infinite;
+        }
+
+        /* Scanline Overlay */
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 240, 255, 0.03) 50%,
+                rgba(0, 240, 255, 0.03)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        /* Custom Scrollbar for Terminal */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(5, 11, 20, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.3);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 240, 255, 0.6);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative overflow-x-hidden scanline">
+
+    <!-- Top Navigation / Header HUD -->
+    <header class="border-b border-cyber-border bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <!-- Title & Status -->
+            <div class="flex items-center space-x-4">
+                <div class="relative flex items-center justify-center w-10 h-10 rounded border border-cyber-blue/40 bg-cyber-darkblue/50 text-cyber-blue font-orbitron font-bold text-xl">
+                    <i class="fa-solid fa-shuttle-space animate-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="font-orbitron font-extrabold text-xl md:text-2xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyber-blue via-teal-300 to-cyber-purple glow-text-cyan">
+                        ASTRAEA-IX <span class="text-xs font-mono text-cyan-400 font-normal px-2 py-0.5 border border-cyan-500/30 rounded bg-cyan-950/40">EXPLORADOR-V</span>
+                    </h1>
+                    <p class="text-xs font-mono text-slate-400 flex items-center gap-2">
+                        <span>OBJETIVO: <strong class="text-slate-200">KEPLER-186F</strong></span>
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span class="text-emerald-400 font-semibold">SEÑAL ACTIVA</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Time & Coordinates HUD -->
+            <div class="hidden lg:flex items-center space-x-6 font-mono text-xs text-slate-300 border-x border-cyber-border/60 px-6 py-1">
+                <div>
+                    <span class="text-slate-500 block text-[10px]">TIEMPO DE MISIÓN (MET)</span>
+                    <span id="met-clock" class="text-cyber-blue font-bold text-sm">342:18:45:09</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px]">SECTOR REGIONAL</span>
+                    <span class="text-teal-300 font-bold text-sm">BRAZO CYGNUS 049</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px]">FRECUENCIA SUB-ESPACIAL</span>
+                    <span class="text-purple-300 font-bold text-sm">1420.405 MHz</span>
+                </div>
+            </div>
+
+            <!-- Global Action Controls -->
+            <div class="flex items-center space-x-3">
+                <button onclick="triggerScan()" class="px-3 py-1.5 rounded text-xs font-orbitron font-semibold bg-cyber-blue/10 border border-cyber-blue/50 text-cyber-blue hover:bg-cyber-blue hover:text-black transition-all duration-200 flex items-center gap-2">
+                    <i class="fa-solid fa-radar"></i>
+                    <span>ESCÁNER CUÁNTICO</span>
+                </button>
+                <button onclick="toggleAlertState()" id="alert-btn" class="px-3 py-1.5 rounded text-xs font-orbitron font-semibold bg-amber-500/10 border border-amber-500/50 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-200 flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="alert-text">ESTADO DEFENSIVO</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Body -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+        <!-- Top Telemetry Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Card 1: Velocity -->
+            <div class="cyber-panel p-4 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-xs font-mono text-slate-400">VELOCIDAD ORBITAL</span>
+                        <h3 class="font-orbitron text-2xl font-bold text-cyber-blue tracking-wide mt-1" id="val-velocity">42,850</h3>
+                    </div>
+                    <span class="p-2 rounded bg-cyan-950/60 border border-cyan-500/30 text-cyber-blue text-sm">
+                        <i class="fa-solid fa-gauge-high"></i>
+                    </span>
+                </div>
+                <div class="mt-4 flex items-center justify-between text-xs font-mono">
+                    <span class="text-slate-400">UNIDAD: <strong class="text-slate-200">KM/H</strong></span>
+                    <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-caret-up"></i> +0.12%</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Hull Integrity -->
+            <div class="cyber-panel p-4 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-xs font-mono text-slate-400">INTEGRIDAD DEL CASCO</span>
+                        <h3 class="font-orbitron text-2xl font-bold text-teal-300 tracking-wide mt-1" id="val-hull">99.2%</h3>
+                    </div>
+                    <span class="p-2 rounded bg-teal-950/60 border border-teal-500/30 text-teal-300 text-sm">
+                        <i class="fa-solid fa-shield-cat"></i>
+                    </span>
+                </div>
+                <div class="mt-4 w-full bg-slate-900 rounded-full h-1.5 border border-slate-700 overflow-hidden">
+                    <div id="bar-hull" class="bg-gradient-to-r from-teal-500 to-cyber-teal h-full transition-all duration-500" style="width: 99.2%"></div>
+                </div>
+            </div>
+
+            <!-- Card 3: Shield Integrity -->
+            <div class="cyber-panel p-4 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-xs font-mono text-slate-400">ENERGÍA DE ESCUDOS</span>
+                        <h3 class="font-orbitron text-2xl font-bold text-purple-400 tracking-wide mt-1" id="val-shields">98.4%</h3>
+                    </div>
+                    <span class="p-2 rounded bg-purple-950/60 border border-purple-500/30 text-purple-400 text-sm">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </span>
+                </div>
+                <div class="mt-4 w-full bg-slate-900 rounded-full h-1.5 border border-slate-700 overflow-hidden">
+                    <div id="bar-shields" class="bg-gradient-to-r from-purple-500 to-cyber-blue h-full transition-all duration-500" style="width: 98.4%"></div>
+                </div>
+            </div>
+
+            <!-- Card 4: Radiation Level -->
+            <div class="cyber-panel p-4 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-xs font-mono text-slate-400">RADIACIÓN EXTERIOR</span>
+                        <h3 class="font-orbitron text-2xl font-bold text-amber-400 tracking-wide mt-1" id="val-radiation">1.24 mSv/h</h3>
+                    </div>
+                    <span class="p-2 rounded bg-amber-950/60 border border-amber-500/30 text-amber-400 text-sm">
+                        <i class="fa-solid fa-radiation"></i>
+                    </span>
+                </div>
+                <div class="mt-4 flex items-center justify-between text-xs font-mono">
+                    <span class="text-slate-400">NIVEL: <strong class="text-amber-300">MODERADO</strong></span>
+                    <span class="text-emerald-400">TOLERABLE</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Middle Section: Power Consumption/Generation Chart & Target Planet Status -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Power Generation vs Consumption Line Chart (2 Cols) -->
+            <div class="lg:col-span-2 cyber-panel p-5 flex flex-col">
+                <div class="flex flex-wrap justify-between items-center mb-4 pb-2 border-b border-cyber-border/40 gap-2">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-bolt text-cyber-blue"></i>
+                        <h2 class="font-orbitron text-sm font-semibold tracking-wider text-slate-200">GENERACIÓN VS. CONSUMO DE ENERGÍA (GW)</h2>
+                    </div>
+                    <div class="flex space-x-1 bg-slate-900/80 p-1 rounded border border-slate-800 text-xs font-mono">
+                        <button onclick="updateEnergyChartTimeframe('1h')" id="tf-1h" class="px-2.5 py-1 rounded bg-cyber-blue/20 text-cyber-blue font-bold">1H</button>
+                        <button onclick="updateEnergyChartTimeframe('24h')" id="tf-24h" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200">24H</button>
+                        <button onclick="updateEnergyChartTimeframe('7d')" id="tf-7d" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200">7D</button>
+                    </div>
+                </div>
+                <div class="relative w-full flex-grow min-h-[260px]">
+                    <canvas id="energyLineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Target Exoplanet Status Card -->
+            <div class="cyber-panel p-5 flex flex-col justify-between relative overflow-hidden">
+                <!-- Background Radar Sweep Animation -->
+                <div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                    <div class="w-64 h-64 border border-cyan-400 rounded-full radar-sweep border-t-transparent border-l-transparent"></div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center pb-2 border-b border-cyber-border/40 mb-4">
+                        <h2 class="font-orbitron text-sm font-semibold tracking-wider text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-globe text-teal-400"></i>
+                            EXOPLANETA: KEPLER-186F
+                        </h2>
+                        <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">ZONA HABITABLE</span>
+                    </div>
+
+                    <!-- Visual Sphere Preview -->
+                    <div class="flex justify-center my-4">
+                        <div class="relative w-32 h-32 rounded-full bg-gradient-to-tr from-cyan-900 via-teal-700 to-emerald-400 p-1 shadow-[0_0_25px_rgba(0,255,204,0.4)] flex items-center justify-center group cursor-pointer" onclick="openPlanetModal()">
+                            <div class="w-full h-full rounded-full bg-slate-950/40 backdrop-blur-sm flex items-center justify-center border border-cyan-400/50">
+                                <i class="fa-solid fa-earth-americas text-5xl text-teal-300 opacity-80 group-hover:scale-110 transition-transform duration-300"></i>
+                            </div>
+                            <span class="absolute bottom-1 bg-slate-950/90 text-[10px] font-mono px-2 py-0.5 rounded border border-teal-500/40 text-teal-300">CLIC PARA ANALIZAR</span>
+                        </div>
+                    </div>
+
+                    <!-- Atmosphere Metrics Quick List -->
+                    <div class="space-y-2 text-xs font-mono">
+                        <div class="flex justify-between text-slate-300 border-b border-slate-800/80 pb-1">
+                            <span class="text-slate-400">TEMP. SUPERFICIE:</span>
+                            <span class="text-emerald-400">-5°C a 15°C</span>
+                        </div>
+                        <div class="flex justify-between text-slate-300 border-b border-slate-800/80 pb-1">
+                            <span class="text-slate-400">GRAVEDAD:</span>
+                            <span class="text-cyan-300">1.11g</span>
+                        </div>
+                        <div class="flex justify-between text-slate-300 border-b border-slate-800/80 pb-1">
+                            <span class="text-slate-400">RADIO TERRESTRE:</span>
+                            <span class="text-slate-200">1.17 R⊕</span>
+                        </div>
+                        <div class="flex justify-between text-slate-300">
+                            <span class="text-slate-400">PERÍODO ORBITAL:</span>
+                            <span class="text-amber-300">129.9 Días</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 mt-4">
+                    <button onclick="analyzePlanetAspect('superficie')" class="py-1.5 rounded font-orbitron text-[10px] font-semibold bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500 hover:text-black transition-all">
+                        SUPERFICIE
+                    </button>
+                    <button onclick="analyzePlanetAspect('atmosfera')" class="py-1.5 rounded font-orbitron text-[10px] font-semibold bg-teal-500/10 border border-teal-500/40 text-teal-300 hover:bg-teal-500 hover:text-black transition-all">
+                        ATMÓSFERA
+                    </button>
+                    <button onclick="analyzePlanetAspect('magnetosfera')" class="py-1.5 rounded font-orbitron text-[10px] font-semibold bg-purple-500/10 border border-purple-500/40 text-purple-300 hover:bg-purple-500 hover:text-black transition-all">
+                        MAGNETO
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Section: Subsystems Control, Atmospheric Radar & Live Log Console -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Interactive Subsystems Control Panel -->
+            <div class="cyber-panel p-5">
+                <div class="flex items-center space-x-2 pb-2 border-b border-cyber-border/40 mb-4">
+                    <i class="fa-solid fa-sliders text-cyber-blue"></i>
+                    <h2 class="font-orbitron text-sm font-semibold tracking-wider text-slate-200">CONTROL DE SUBSISTEMAS</h2>
+                </div>
+
+                <div class="space-y-3 font-mono text-xs">
+                    <!-- Toggle 1: Escudos Térmicos -->
+                    <div class="flex items-center justify-between p-2.5 rounded bg-slate-900/60 border border-slate-800 hover:border-cyber-blue/40 transition-all">
+                        <div>
+                            <div class="font-semibold text-slate-200">ESCUDOS TÉRMICOS</div>
+                            <div class="text-[10px] text-slate-400">Protección contra reentrada radiativa</div>
+                        </div>
+                        <button onclick="toggleSystem('escudosTermicos')" id="btn-escudosTermicos" class="px-3 py-1 rounded font-orbitron font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black transition-all">
+                            ACTIVO
+                        </button>
+                    </div>
+
+                    <!-- Toggle 2: Motor Warp -->
+                    <div class="flex items-center justify-between p-2.5 rounded bg-slate-900/60 border border-slate-800 hover:border-cyber-blue/40 transition-all">
+                        <div>
+                            <div class="font-semibold text-slate-200">MOTOR WARP</div>
+                            <div class="text-[10px] text-slate-400">Propulsión hiperespacial Alcubierre</div>
+                        </div>
+                        <button onclick="toggleSystem('motorWarp')" id="btn-motorWarp" class="px-3 py-1 rounded font-orbitron font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500 hover:text-black transition-all">
+                            EN ESPERA
+                        </button>
+                    </div>
+
+                    <!-- Toggle 3: Escáner Cuántico -->
+                    <div class="flex items-center justify-between p-2.5 rounded bg-slate-900/60 border border-slate-800 hover:border-cyber-blue/40 transition-all">
+                        <div>
+                            <div class="font-semibold text-slate-200">ESCÁNER CUÁNTICO</div>
+                            <div class="text-[10px] text-slate-400">Detección de espectro continuo</div>
+                        </div>
+                        <button onclick="toggleSystem('escanerCuantico')" id="btn-escanerCuantico" class="px-3 py-1 rounded font-orbitron font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black transition-all">
+                            ACTIVO
+                        </button>
+                    </div>
+
+                    <!-- Toggle 4: Transmisor de Largo Alcance -->
+                    <div class="flex items-center justify-between p-2.5 rounded bg-slate-900/60 border border-slate-800 hover:border-cyber-blue/40 transition-all">
+                        <div>
+                            <div class="font-semibold text-slate-200">TRANSMISOR LARGO ALCANCE</div>
+                            <div class="text-[10px] text-slate-400">Enlace cuántico hacia la Tierra</div>
+                        </div>
+                        <button onclick="toggleSystem('transmisor')" id="btn-transmisor" class="px-3 py-1 rounded font-orbitron font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black transition-all">
+                            ACTIVO
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Atmospheric Radar Doughnut Chart -->
+            <div class="cyber-panel p-5 flex flex-col">
+                <div class="flex items-center justify-between pb-2 border-b border-cyber-border/40 mb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-pie-chart text-teal-400"></i>
+                        <h2 class="font-orbitron text-sm font-semibold tracking-wider text-slate-200">COMPOSICIÓN ATMOSFÉRICA</h2>
+                    </div>
+                    <span class="text-xs font-mono text-teal-400">SPECTRO-V4</span>
+                </div>
+                <div class="relative w-full flex-grow flex items-center justify-center min-h-[200px]">
+                    <canvas id="atmosphereRadarChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Live Telemetry Terminal Console -->
+            <div class="cyber-panel p-5 flex flex-col">
+                <div class="flex items-center justify-between pb-2 border-b border-cyber-border/40 mb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-terminal text-emerald-400"></i>
+                        <h2 class="font-orbitron text-sm font-semibold tracking-wider text-slate-200">REGISTROS DE TELEMETRÍA</h2>
+                    </div>
+                    <button onclick="clearConsole()" class="text-[10px] font-mono text-slate-400 hover:text-cyber-blue">LIMPIAR</button>
+                </div>
+                <div id="terminal-log" class="flex-grow font-mono text-xs text-slate-300 space-y-2 overflow-y-auto max-h-[220px] p-2 bg-slate-950/90 rounded border border-slate-800">
+                    <!-- Dynamic logs inserted via JS -->
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal: Spectrometry & Planetary Radar Report -->
+    <div id="planetModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="cyber-panel max-w-2xl w-full p-6 relative">
+            <button onclick="closePlanetModal()" class="absolute top-4 right-4 text-slate-400 hover:text-cyber-blue text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="flex items-center space-x-3 mb-4">
+                <i class="fa-solid fa-microscope text-2xl text-teal-300"></i>
+                <h3 id="modal-title" class="font-orbitron font-bold text-lg text-slate-100">ANÁLISIS DE KEPLER-186F</h3>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-4" id="modal-content-grid">
+                <div class="h-64 flex items-center justify-center">
+                    <canvas id="modalRadarChart"></canvas>
+                </div>
+                <div class="flex flex-col justify-center space-y-3 font-mono text-xs" id="modal-details-list">
+                    <div class="p-3 bg-slate-900/80 rounded border border-slate-800">
+                        <span class="text-slate-400 block mb-1">NITRÓGENO (N2)</span>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div class="bg-cyan-400 h-full" style="width: 74%"></div>
+                        </div>
+                        <span class="text-right block text-cyan-300 mt-1">74%</span>
+                    </div>
+                    <div class="p-3 bg-slate-900/80 rounded border border-slate-800">
+                        <span class="text-slate-400 block mb-1">OXÍGENO (O2)</span>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div class="bg-emerald-400 h-full" style="width: 19%"></div>
+                        </div>
+                        <span class="text-right block text-emerald-300 mt-1">19%</span>
+                    </div>
+                    <div class="p-3 bg-slate-900/80 rounded border border-slate-800">
+                        <span class="text-slate-400 block mb-1">DIÓXIDO DE CARBONO Y OTROS</span>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div class="bg-purple-400 h-full" style="width: 7%"></div>
+                        </div>
+                        <span class="text-right block text-purple-300 mt-1">7%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 flex justify-end">
+                <button onclick="closePlanetModal()" class="px-4 py-2 font-orbitron text-xs font-semibold bg-cyber-blue text-black rounded hover:bg-cyan-300 transition-colors">
+                    CERRAR REPORTE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logic for Dashboard -->
+    <script>
+        // Global Chart Handles
+        let energyLineChart = null;
+        let atmosphereRadarChart = null;
+        let modalRadarChart = null;
+
+        // System States
+        const systemStates = {
+            escudosTermicos: true,
+            motorWarp: false,
+            escanerCuantico: true,
+            transmisor: true
+        };
+
+        // Standard Initialization
+        window.onload = function() {
+            initEnergyLineChart();
+            initAtmosphereChart();
+            startLiveUpdates();
+            logMessage('Dashboard de telemetría en línea. Enlace establecido con la nave Astraea-IX.', 'INFO');
+        };
+
+        // Mission Elapsed Time (MET) Clock Simulation
+        let metSeconds = 342 * 86400 + 18 * 3600 + 45 * 60 + 9;
+        setInterval(() => {
+            metSeconds++;
+            const days = Math.floor(metSeconds / 86400);
+            const hours = Math.floor((metSeconds % 86400) / 3600);
+            const mins = Math.floor((metSeconds % 3600) / 60);
+            const secs = metSeconds % 60;
+            document.getElementById('met-clock').innerText = 
+                `${days.toString().padStart(3, '0')}:${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }, 1000);
+
+        // Chart 1: Power Generation vs Consumption Area/Line Chart
+        function initEnergyLineChart() {
+            const ctx = document.getElementById('energyLineChart').getContext('2d');
+            
+            const gradientGen = ctx.createLinearGradient(0, 0, 0, 300);
+            gradientGen.addColorStop(0, 'rgba(0, 240, 255, 0.3)');
+            gradientGen.addColorStop(1, 'rgba(0, 240, 255, 0.0)');
+
+            const gradientCons = ctx.createLinearGradient(0, 0, 0, 300);
+            gradientCons.addColorStop(0, 'rgba(255, 0, 127, 0.3)');
+            gradientCons.addColorStop(1, 'rgba(255, 0, 127, 0.0)');
+
+            energyLineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+                    datasets: [
+                        {
+                            label: 'Generación (GW)',
+                            data: [120, 122, 125, 124, 128, 130, 132],
+                            borderColor: '#00f0ff',
+                            borderWidth: 2,
+                            backgroundColor: gradientGen,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#00f0ff'
+                        },
+                        {
+                            label: 'Consumo (GW)',
+                            data: [95, 98, 102, 100, 105, 108, 110],
+                            borderColor: '#ff007f',
+                            borderWidth: 2,
+                            backgroundColor: gradientCons,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#ff007f'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#94a3b8', font: { family: 'Share Tech Mono' } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(22, 42, 69, 0.5)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Share Tech Mono' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(22, 42, 69, 0.5)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Share Tech Mono' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Planetary Atmospheric Spectrometry Radar
+        function initAtmosphereChart() {
+            const ctx = document.getElementById('atmosphereRadarChart').getContext('2d');
+            atmosphereRadarChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Nitrógeno', 'Oxígeno', 'Dióxido de Carbono', 'Argón / Otros'],
+                    datasets: [{
+                        data: [74, 19, 5, 2],
+                        backgroundColor: ['#00f0ff', '#00ffcc', '#7000ff', '#ff007f'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { family: 'Share Tech Mono', size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Live Simulated Data Updates
+        function startLiveUpdates() {
+            setInterval(() => {
+                // Fluctuate Velocity slightly
+                const velElem = document.getElementById('val-velocity');
+                let curVel = parseInt(velElem.innerText.replace(',', ''));
+                let change = Math.floor(Math.random() * 30) - 14;
+                curVel += change;
+                velElem.innerText = curVel.toLocaleString();
+
+                // Fluctuate Radiation Level
+                const radElem = document.getElementById('val-radiation');
+                let radVal = (1.20 + Math.random() * 0.1).toFixed(2);
+                radElem.innerText = `${radVal} mSv/h`;
+
+                // Random Telemetry Event Simulation in Spanish
+                if (Math.random() > 0.7) {
+                    const events = [
+                        'Fluctuación de radiación solar detectada (+0.04 µSv/h).',
+                        'Señal sub-espacial sincronizada con el Repetidor Orbital Alfa.',
+                        'El escudo deflector registró un impacto menor de micrometeorito.',
+                        'Purificadores del sistema de soporte vital operando de manera óptima.',
+                        'Anomalía de lente gravitatoria escaneada en el Sector 049.',
+                        'Comprobación de integridad de datos cuánticos completada sin errores.'
+                    ];
+                    const randomEvt = events[Math.floor(Math.random() * events.length)];
+                    logMessage(randomEvt, 'SIS');
+                }
+            }, 3000);
+        }
+
+        // Add Entry to Terminal Console
+        function logMessage(msg, type = 'INFO') {
+            const consoleBox = document.getElementById('terminal-log');
+            const timestamp = new Date().toISOString().substring(11, 19);
+            let color = 'text-cyan-400';
+            if (type === 'ADVERT') color = 'text-amber-400';
+            if (type === 'ALERTA') color = 'text-pink-500 font-bold';
+
+            const logItem = document.createElement('div');
+            logItem.className = 'flex items-start space-x-2 border-b border-slate-900/40 pb-1';
+            logItem.innerHTML = `<span class="text-slate-500">[${timestamp}]</span> <span class="${color}">[${type}]</span> <span class="text-slate-200">${msg}</span>`;
+            
+            consoleBox.appendChild(logItem);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('terminal-log').innerHTML = '';
+            logMessage('Consola de registros limpiada.', 'INFO');
+        }
+
+        // Interactive Subsystem Toggles
+        function toggleSystem(sysName) {
+            systemStates[sysName] = !systemStates[sysName];
+            const btn = document.getElementById(`btn-${sysName}`);
+            
+            const sysNamesES = {
+                escudosTermicos: 'ESCUDOS TÉRMICOS',
+                motorWarp: 'MOTOR WARP',
+                escanerCuantico: 'ESCÁNER CUÁNTICO',
+                transmisor: 'TRANSMISOR LARGO ALCANCE'
+            };
+
+            if (systemStates[sysName]) {
+                btn.className = "px-3 py-1 rounded font-orbitron font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black transition-all";
+                btn.innerText = "ACTIVO";
+                logMessage(`Subsistema [${sysNamesES[sysName]}] activado correctamente.`, 'INFO');
+            } else {
+                btn.className = "px-3 py-1 rounded font-orbitron font-semibold bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500 hover:text-white transition-all";
+                btn.innerText = "INACTIVO";
+                logMessage(`Subsistema [${sysNamesES[sysName]}] desactivado por directiva.`, 'ADVERT');
+            }
+        }
+
+        // Trigger Deep Scan Action
+        function triggerScan() {
+            logMessage('Iniciando pulso de escáner cuántico de espacio profundo...', 'INFO');
+            setTimeout(() => {
+                logMessage('Escaneo completo: 0 obstáculos físicos detectados en el vector directo.', 'INFO');
+            }, 1200);
+        }
+
+        // Toggle Defense Alert Mode
+        let isAlert = false;
+        function toggleAlertState() {
+            isAlert = !isAlert;
+            const alertBtn = document.getElementById('alert-btn');
+            const alertText = document.getElementById('alert-text');
+            
+            if (isAlert) {
+                alertBtn.className = "px-3 py-1.5 rounded text-xs font-orbitron font-semibold bg-red-500/20 border border-red-500/80 text-red-400 hover:bg-red-500 hover:text-black transition-all duration-200 flex items-center gap-2 animate-pulse";
+                alertText.innerText = "ALERTA ROJA ACTIVADA";
+                logMessage('¡ALERTA ROJA DEFENSIVA ACTIVADA! Protocolos de combate listos.', 'ALERTA');
+            } else {
+                alertBtn.className = "px-3 py-1.5 rounded text-xs font-orbitron font-semibold bg-amber-500/10 border border-amber-500/50 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-200 flex items-center gap-2";
+                alertText.innerText = "ESTADO DEFENSIVO";
+                logMessage('El estado de defensa ha retornado a su nivel nominal.', 'INFO');
+            }
+        }
+
+        // Chart Timeframe Selector
+        function updateEnergyChartTimeframe(tf) {
+            ['1h', '24h', '7d'].forEach(t => {
+                const b = document.getElementById(`tf-${t}`);
+                if (t === tf) {
+                    b.className = "px-2.5 py-1 rounded bg-cyber-blue/20 text-cyber-blue font-bold";
+                } else {
+                    b.className = "px-2.5 py-1 rounded text-slate-400 hover:text-slate-200";
+                }
+            });
+
+            // Simulated Dataset Swap
+            let newDataGen = [];
+            let newDataCons = [];
+
+            if (tf === '1h') {
+                newDataGen = [130, 131, 131, 132, 132, 133, 132];
+                newDataCons = [108, 109, 108, 110, 109, 110, 110];
+            } else if (tf === '24h') {
+                newDataGen = [120, 122, 125, 124, 128, 130, 132];
+                newDataCons = [95, 98, 102, 100, 105, 108, 110];
+            } else if (tf === '7d') {
+                newDataGen = [110, 115, 118, 122, 125, 129, 132];
+                newDataCons = [88, 92, 95, 99, 102, 106, 110];
+            }
+
+            energyLineChart.data.datasets[0].data = newDataGen;
+            energyLineChart.data.datasets[1].data = newDataCons;
+            energyLineChart.update();
+            logMessage(`Vista de gráfico energético recalculada para intervalo: [${tf.toUpperCase()}].`, 'INFO');
+        }
+
+        // Interactive Planet Analysis Modes
+        function analyzePlanetAspect(aspect) {
+            openPlanetModal();
+            const modalTitle = document.getElementById('modal-title');
+            
+            if (aspect === 'superficie') {
+                modalTitle.innerText = "ANÁLISIS DE SUPERFICIE DE KEPLER-186F";
+                logMessage('Escaneo espectral de superficie ejecutado: composición rocosa rica en silicatos e hierro.', 'INFO');
+            } else if (aspect === 'atmosfera') {
+                modalTitle.innerText = "ANÁLISIS ATMOSFÉRICO DE KEPLER-186F";
+                logMessage('Firma atmosférica procesada: presencia relevante de nitrógeno u oxígeno.', 'INFO');
+            } else if (aspect === 'magnetosfera') {
+                modalTitle.innerText = "ANÁLISIS DE MAGNETOSFERA DE KEPLER-186F";
+                logMessage('Escaneo de campo magnético: 0.85 Gauss. Suficiente para desviar radiación estelar.', 'INFO');
+            }
+        }
+
+        // Modal Controls
+        function openPlanetModal() {
+            document.getElementById('planetModal').classList.remove('hidden');
+            document.getElementById('planetModal').classList.add('flex');
+            
+            // Render Radar Modal Chart if not present
+            if (!modalRadarChart) {
+                const ctx = document.getElementById('modalRadarChart').getContext('2d');
+                modalRadarChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Densidad', 'Campo Magnético', 'Agua Líquida', 'Temperatura', 'Radiación Solar', 'Habitabilidad'],
+                        datasets: [{
+                            label: 'Índice de Kepler-186f',
+                            data: [85, 78, 65, 80, 55, 88],
+                            backgroundColor: 'rgba(0, 240, 255, 0.25)',
+                            borderColor: '#00f0ff',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#00ffcc'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            r: {
+                                angleLines: { color: 'rgba(22, 42, 69, 0.8)' },
+                                grid: { color: 'rgba(22, 42, 69, 0.8)' },
+                                pointLabels: { color: '#94a3b8', font: { family: 'Share Tech Mono', size: 10 } },
+                                ticks: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function closePlanetModal() {
+            document.getElementById('planetModal').classList.add('hidden');
+            document.getElementById('planetModal').classList.remove('flex');
+        }
+    </script>
+</body>
+</html>
